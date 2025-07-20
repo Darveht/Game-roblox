@@ -20,34 +20,34 @@ frame.Parent = screenGui
 
 local elements = {"Agua", "Fuego", "Aire", "Tierra", "Azula"}
 for i = 1, #elements do
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 90, 0, 80)
-    btn.Position = UDim2.new(0, 10 + (i-1)*100, 0, 20)
-    btn.Text = elements[i]
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 28
-    btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
-    btn.TextColor3 = Color3.fromRGB(255,255,255)
-    btn.Parent = frame
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0, 90, 0, 80)
+	btn.Position = UDim2.new(0, 10 + (i-1)*100, 0, 20)
+	btn.Text = elements[i]
+	btn.Font = Enum.Font.SourceSansBold
+	btn.TextSize = 28
+	btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+	btn.TextColor3 = Color3.fromRGB(255,255,255)
+	btn.Parent = frame
 
-    btn.MouseButton1Click:Connect(function()
-        element = elements[i]
-        ElementSelected:FireServer(element)
-        screenGui.Enabled = false
-    end)
+	btn.MouseButton1Click:Connect(function()
+		element = elements[i]
+		ElementSelected:FireServer(element)
+		screenGui.Enabled = false
+	end)
 end
 
 screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 -- Instrucciones
 local info = Instance.new("TextLabel")
-info.Size = UDim2.new(1,0,0,30)
-info.Position = UDim2.new(0,0,1,-30)
+info.Size = UDim2.new(1,0,0,60)
+info.Position = UDim2.new(0,0,1,-60)
 info.BackgroundTransparency = 1
-info.Text = "Pulsa el botón de poder o 'Q' para usar tu poder elemental\nSalta (barra espaciadora) para lanzar la bomba de fuego masiva"
+info.Text = "Pulsa 'Q' para poder básico. Usa flechas para poderes especiales:\n← = Poder defensivo/especial | → = Poder de ataque múltiple\n↑ (Salto) = Poder explosivo masivo\nCada elemento tiene diferentes técnicas con las flechas!"
 info.TextColor3 = Color3.fromRGB(255,255,255)
 info.Font = Enum.Font.SourceSans
-info.TextSize = 18
+info.TextSize = 16
 info.Parent = frame
 
 -- Botones móviles
@@ -57,17 +57,17 @@ mobileGui.ResetOnSpawn = false
 mobileGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local function createMobileButton(name, pos, text)
-    local btn = Instance.new("TextButton")
-    btn.Name = name
-    btn.Size = UDim2.new(0, 70, 0, 70)
-    btn.Position = pos
-    btn.BackgroundColor3 = Color3.fromRGB(50,50,100)
-    btn.Text = text
-    btn.TextColor3 = Color3.new(1,1,1)
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 28
-    btn.Parent = mobileGui
-    return btn
+	local btn = Instance.new("TextButton")
+	btn.Name = name
+	btn.Size = UDim2.new(0, 70, 0, 70)
+	btn.Position = pos
+	btn.BackgroundColor3 = Color3.fromRGB(50,50,100)
+	btn.Text = text
+	btn.TextColor3 = Color3.new(1,1,1)
+	btn.Font = Enum.Font.SourceSansBold
+	btn.TextSize = 28
+	btn.Parent = mobileGui
+	return btn
 end
 
 local btnLeft = createMobileButton("LeftBtn", UDim2.new(0, 30, 1, -180), "←")
@@ -81,49 +81,43 @@ btnLeft.MouseButton1Up:Connect(function() moveState = "Idle" end)
 btnRight.MouseButton1Down:Connect(function() moveState = "Right" end)
 btnRight.MouseButton1Up:Connect(function() moveState = "Idle" end)
 btnJump.MouseButton1Click:Connect(function()
-    moveState = "Jump"
-    task.wait(0.3)
-    moveState = "Idle"
+	moveState = "Jump"
+	task.wait(0.3)
+	moveState = "Idle"
 end)
 
--- NUEVO: Integrar WaterDrawGui para el poder de agua
+-- Función para usar poder
 local function tryUsePower()
-    if element == "Agua" then
-        if _G.ShowWaterDrawGui then
-            _G.ShowWaterDrawGui(function(points)
-                -- El WaterDrawGui ya hace DrawnWaterPower:FireServer(points)
-            end)
-        end
-    elseif element then
-        UseElementPower:FireServer(element, moveState)
-    end
+	if element then
+		UseElementPower:FireServer(element, moveState)
+	end
 end
 
 btnPower.MouseButton1Click:Connect(function()
-    tryUsePower()
+	tryUsePower()
 end)
 
 -- Teclado para PC
 local UserInputService = game:GetService("UserInputService")
 UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    if input.KeyCode == Enum.KeyCode.Q and element then
-        tryUsePower()
-    elseif input.KeyCode == Enum.KeyCode.A then
-        moveState = "Left"
-    elseif input.KeyCode == Enum.KeyCode.D then
-        moveState = "Right"
-    elseif input.KeyCode == Enum.KeyCode.Space then
-        moveState = "Jump"
-        -- Lanzar bomba de fuego si el elemento es fuego
-        if element == "Fuego" then
-            UseElementPower:FireServer("Fuego", "Jump")
-        end
-    end
+	if processed then return end
+	if input.KeyCode == Enum.KeyCode.Q and element then
+		tryUsePower()
+	elseif input.KeyCode == Enum.KeyCode.A then
+		moveState = "Left"
+	elseif input.KeyCode == Enum.KeyCode.D then
+		moveState = "Right"
+	elseif input.KeyCode == Enum.KeyCode.Space then
+		moveState = "Jump"
+		-- Lanzar bomba de fuego si el elemento es fuego
+		if element == "Fuego" then
+			UseElementPower:FireServer("Fuego", "Jump")
+		end
+	end
 end)
 UserInputService.InputEnded:Connect(function(input, processed)
-    if input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.D or input.KeyCode == Enum.KeyCode.Space then
-        moveState = "Idle"
-    end
+	if input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.D or input.KeyCode == Enum.KeyCode.Space then
+		moveState = "Idle"
+	end
 end)
 
