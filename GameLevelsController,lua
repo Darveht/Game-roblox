@@ -1,0 +1,525 @@
+-- Controlador de niveles avanzado: meteoritos, zombies, oscuridad, y más niveles
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+local Lighting = game:GetService("Lighting")
+local Debris = game:GetService("Debris")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LEVEL_DURATION = 30
+
+-- RemoteEvent para indicador de nivel
+local levelEvent = ReplicatedStorage:FindFirstChild("LevelIndicatorEvent")
+if not levelEvent then
+    levelEvent = Instance.new("RemoteEvent")
+    levelEvent.Name = "LevelIndicatorEvent"
+    levelEvent.Parent = ReplicatedStorage
+end
+
+local function cleanUp()
+    for _, obj in Workspace:GetChildren() do
+        if obj.Name == "Meteorito" or obj.Name == "Zombie" or obj.Name == "Acido" or obj.Name == "TerremotoPart" or obj.Name == "Lobo" or obj.Name == "SelvaArbol" or obj.Name == "SelvaHierba" or obj.Name == "RefugioSelva" then
+            obj:Destroy()
+        end
+    end
+    -- Limpiar mochilas y mapas de los jugadores
+    for _, p in Players:GetPlayers() do
+        if p.Character then
+            local mochila = p.Character:FindFirstChild("MochilaSelva")
+            if mochila then mochila:Destroy() end
+            local mapa = p.Character:FindFirstChild("MapaSelva") 
+            if mapa then mapa:Destroy() end
+        end
+    end
+end
+
+-- Nivel 1: Lluvia de meteoritos (ahora en todo el mapa)
+local function startMeteorShower()
+    levelEvent:FireAllClients(1, "¡Sobrevive a la lluvia de meteoritos!")
+    local running = true
+    task.spawn(function()
+        while running do
+            local meteor = Instance.new("Part")
+            meteor.Name = "Meteorito"
+            meteor.Shape = Enum.PartType.Ball
+            meteor.Size = Vector3.new(3,3,3)
+            -- Ahora caen en todo el mapa, no solo sobre la casa
+            meteor.Position = Vector3.new(math.random(-120, 80), 80, math.random(-20, 120))
+            meteor.Anchored = false
+            meteor.BrickColor = BrickColor.new("Bright orange")
+            meteor.Material = Enum.Material.Neon
+            meteor.CanCollide = true
+            meteor.Parent = Workspace
+
+            local fire = Instance.new("ParticleEmitter")
+            fire.Texture = "rbxassetid://241594419"
+            fire.Color = ColorSequence.new(Color3.fromRGB(255,120,40))
+            fire.Size = NumberSequence.new(2)
+            fire.Lifetime = NumberRange.new(0.2, 0.5)
+            fire.Rate = 100
+            fire.Speed = NumberRange.new(20, 40)
+            fire.Parent = meteor
+
+            meteor.Touched:Connect(function(hit)
+                local hum = hit.Parent:FindFirstChild("Humanoid")
+                if hum then
+                    hum:TakeDamage(100)
+                end
+                local explosion = Instance.new("Explosion")
+                explosion.Position = meteor.Position
+                explosion.BlastRadius = 8
+                explosion.BlastPressure = 500000
+                explosion.Parent = Workspace
+                meteor:Destroy()
+            end)
+            Debris:AddItem(meteor, 8)
+            task.wait(math.random(0.5, 1.2))
+        end
+    end)
+    task.wait(LEVEL_DURATION)
+    running = false
+end
+
+-- (El resto de los niveles permanece igual...)
+
+-- Nivel 2: Oleada de zombies
+local function startZombieWave()
+    levelEvent:FireAllClients(2, "¡Sobrevive a los zombies!")
+    local running = true
+    local function createZombie(pos)
+        local zombie = Instance.new("Model")
+        zombie.Name = "Zombie"
+        local torso = Instance.new("Part")
+        torso.Name = "Torso"
+        torso.Size = Vector3.new(2,3,1)
+        torso.Position = pos
+        torso.Anchored = false
+        torso.BrickColor = BrickColor.new("Bright green")
+        torso.Parent = zombie
+        local head = Instance.new("Part")
+        head.Name = "Head"
+        head.Size = Vector3.new(2,1,1)
+        head.Position = pos + Vector3.new(0,2,0)
+        head.Anchored = false
+        head.BrickColor = BrickColor.new("Bright yellow")
+        head.Parent = zombie
+        local humanoid = Instance.new("Humanoid")
+        humanoid.MaxHealth = 100
+        humanoid.Health = 100
+        humanoid.Parent = zombie
+        zombie.Parent = Workspace
+        task.spawn(function()
+            while humanoid.Health > 0 and zombie.Parent do
+                local closest = nil
+                local minDist = math.huge
+                for _, p in Players:GetPlayers() do
+                    if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                        local dist = (p.Character.HumanoidRootPart.Position - torso.Position).Magnitude
+                        if dist < minDist then
+                            minDist = dist
+                            closest = p
+                        end
+                    end
+                end
+                if closest and closest.Character and closest.Character:FindFirstChild("HumanoidRootPart") then
+                    local dir = (closest.Character.HumanoidRootPart.Position - torso.Position).Unit
+                    torso.Velocity = dir * 12
+                    head.Velocity = dir * 12
+                end
+                task.wait(0.2)
+            end
+        end)
+        torso.Touched:Connect(function(hit)
+            local hum = hit.Parent:FindFirstChild("Humanoid")
+            if hum and hum.Health > 0 then
+                hum:TakeDamage(20)
+            end
+        end)
+        return zombie
+    end
+
+    task.spawn(function()
+        while running do
+            local pos = Vector3.new(math.random(-55, -25), 3, math.random(45, 75))
+            createZombie(pos)
+            task.wait(math.random(1,2))
+        end
+    end)
+    task.wait(LEVEL_DURATION)
+    running = false
+end
+
+-- Nivel 3: Oscuridad total mejorada
+local function startDarkness()
+    levelEvent:FireAllClients(3, "¡Sobrevive en la oscuridad!")
+    local oldAmbient = Lighting.Ambient
+    local oldBrightness = Lighting.Brightness
+    local oldSky = Lighting:FindFirstChildOfClass("Sky")
+    Lighting.Ambient = Color3.fromRGB(5,5,5)
+    Lighting.Brightness = 0.05
+    -- Cambiar Skybox a uno oscuro
+    for _, obj in Lighting:GetChildren() do
+        if obj:IsA("Sky") then obj.Parent = nil end
+    end
+    local sky = Instance.new("Sky")
+    sky.SkyboxBk = "rbxassetid://159454299" -- night sky
+    sky.SkyboxDn = "rbxassetid://159454296"
+    sky.SkyboxFt = "rbxassetid://159454293"
+    sky.SkyboxLf = "rbxassetid://159454286"
+    sky.SkyboxRt = "rbxassetid://159454300"
+    sky.SkyboxUp = "rbxassetid://159454288"
+    sky.Parent = Lighting
+    -- Dar linterna a todos los jugadores
+    local event = ReplicatedStorage:FindFirstChild("GiveFlashlight")
+    if event then
+        for _, p in Players:GetPlayers() do
+            event:FireClient(p)
+        end
+    end
+    task.wait(LEVEL_DURATION)
+    -- Restaurar luz
+    Lighting.Ambient = oldAmbient
+    Lighting.Brightness = oldBrightness
+    for _, obj in Lighting:GetChildren() do
+        if obj:IsA("Sky") then obj:Destroy() end
+    end
+    if oldSky then oldSky.Parent = Lighting end
+end
+
+-- Nivel 4: Piso resbaladizo (ahora con hielo)
+local function startSlippery()
+    levelEvent:FireAllClients(4, "¡Cuidado, el piso es de hielo!")
+    -- Cambiar Material de todas las partes del suelo a Ice
+    local changedParts = {}
+    for _, part in Workspace:GetChildren() do
+        if part:IsA("Part") and part.Position.Y < 3 then
+            changedParts[part] = part.Material
+            part.Material = Enum.Material.Ice
+            part.CustomPhysicalProperties = PhysicalProperties.new(0.1, 0.05, 0.5)
+        end
+    end
+    task.wait(LEVEL_DURATION)
+    -- Restaurar material y fricción
+    for part, oldMat in changedParts do
+        if part and part.Parent then
+            part.Material = oldMat
+            part.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.5)
+        end
+    end
+end
+
+-- Nivel 5: Lluvia ácida
+local function startAcidRain()
+    levelEvent:FireAllClients(5, "¡Refúgiate de la lluvia ácida!")
+    local running = true
+    task.spawn(function()
+        while running do
+            local acido = Instance.new("Part")
+            acido.Name = "Acido"
+            acido.Shape = Enum.PartType.Ball
+            acido.Size = Vector3.new(2,2,2)
+            acido.Position = Vector3.new(math.random(-60, 0), 80, math.random(40, 80))
+            acido.Anchored = false
+            acido.BrickColor = BrickColor.new("Bright yellowish green")
+            acido.Material = Enum.Material.Neon
+            acido.CanCollide = false
+            acido.Parent = Workspace
+
+            local emitter = Instance.new("ParticleEmitter")
+            emitter.Texture = "rbxassetid://484436622"
+            emitter.Color = ColorSequence.new(Color3.fromRGB(180,255,80))
+            emitter.Size = NumberSequence.new(1.5)
+            emitter.Lifetime = NumberRange.new(0.2, 0.5)
+            emitter.Rate = 80
+            emitter.Speed = NumberRange.new(10, 20)
+            emitter.Parent = acido
+
+            acido.Touched:Connect(function(hit)
+                local hum = hit.Parent:FindFirstChild("Humanoid")
+                if hum then
+                    hum:TakeDamage(30)
+                end
+                acido:Destroy()
+            end)
+            Debris:AddItem(acido, 8)
+            task.wait(math.random(0.3, 0.8))
+        end
+    end)
+    task.wait(LEVEL_DURATION)
+    running = false
+end
+
+-- Nivel 6: Selva nocturna, refugios, lobos, linterna y mochila con mapa
+local function startJungleNight()
+    local DURATION = 120
+    levelEvent:FireAllClients(6, "¡Encuentra refugio en la selva y sobrevive a los lobos!")
+    -- Guardar Lighting original
+    local oldAmbient = Lighting.Ambient
+    local oldBrightness = Lighting.Brightness
+    local oldOutdoor = Lighting.OutdoorAmbient
+    local oldSky = Lighting:FindFirstChildOfClass("Sky")
+    Lighting.Ambient = Color3.fromRGB(8,8,16)
+    Lighting.OutdoorAmbient = Color3.fromRGB(8,8,16)
+    Lighting.Brightness = 0.08
+    -- Skybox nocturno
+    for _, obj in Lighting:GetChildren() do
+        if obj:IsA("Sky") then obj.Parent = nil end
+    end
+    local sky = Instance.new("Sky")
+    sky.SkyboxBk = "rbxassetid://159454299"
+    sky.SkyboxDn = "rbxassetid://159454296"
+    sky.SkyboxFt = "rbxassetid://159454293"
+    sky.SkyboxLf = "rbxassetid://159454286"
+    sky.SkyboxRt = "rbxassetid://159454300"
+    sky.SkyboxUp = "rbxassetid://159454288"
+    sky.Parent = Lighting
+
+    -- Generar árboles y hierba
+    for i = 1, 40 do
+        local arbol = Instance.new("Part")
+        arbol.Name = "SelvaArbol"
+        arbol.Size = Vector3.new(2, math.random(18,28), 2)
+        arbol.Position = Vector3.new(math.random(-80,40), arbol.Size.Y/2+1, math.random(20,90))
+        arbol.Anchored = true
+        arbol.Color = Color3.fromRGB(80,60,30)
+        arbol.Material = Enum.Material.Wood
+        arbol.Parent = Workspace
+
+        local copa = Instance.new("Part")
+        copa.Name = "SelvaArbol"
+        copa.Size = Vector3.new(math.random(8,13), math.random(7,10), math.random(8,13))
+        copa.Position = arbol.Position + Vector3.new(0, arbol.Size.Y/2 + copa.Size.Y/2, 0)
+        copa.Anchored = true
+        copa.Color = Color3.fromRGB(40,120,40)
+        copa.Material = Enum.Material.Grass
+        copa.Parent = Workspace
+    end
+    for i = 1, 60 do
+        local hierba = Instance.new("Part")
+        hierba.Name = "SelvaHierba"
+        hierba.Size = Vector3.new(math.random(2,5), math.random(2,4), math.random(2,5))
+        hierba.Position = Vector3.new(math.random(-80,40), 1.5, math.random(20,90))
+        hierba.Anchored = true
+        hierba.Color = Color3.fromRGB(60,180,60)
+        hierba.Material = Enum.Material.Grass
+        hierba.Transparency = 0.2
+        hierba.Parent = Workspace
+    end
+
+    -- Crear refugios (zonas seguras)
+    local refugios = {}
+    for i = 1, 4 do
+        local refugio = Instance.new("Part")
+        refugio.Name = "RefugioSelva"
+        refugio.Size = Vector3.new(10, 8, 10)
+        refugio.Position = Vector3.new(math.random(-70,30), 5, math.random(30,80))
+        refugio.Anchored = true
+        refugio.Color = Color3.fromRGB(200,200,120)
+        refugio.Material = Enum.Material.WoodPlanks
+        refugio.Transparency = 0.2
+        refugio.Parent = Workspace
+        table.insert(refugios, refugio)
+    end
+
+    -- Dar linterna y mochila con mapa a cada jugador
+    local flashlightEvent = ReplicatedStorage:FindFirstChild("GiveFlashlight")
+    for _, p in Players:GetPlayers() do
+        if flashlightEvent then
+            flashlightEvent:FireClient(p)
+        end
+        if p.Character then
+            -- Mochila verde
+            if not p.Character:FindFirstChild("MochilaSelva") then
+                local mochila = Instance.new("Part")
+                mochila.Name = "MochilaSelva"
+                mochila.Size = Vector3.new(2,3,1)
+                mochila.Color = Color3.fromRGB(40,120,40)
+                mochila.Material = Enum.Material.Fabric
+                mochila.CanCollide = false
+                mochila.Anchored = false
+                mochila.Parent = p.Character
+                local weld = Instance.new("WeldConstraint")
+                weld.Part0 = mochila
+                local torso = p.Character:FindFirstChild("UpperTorso") or p.Character:FindFirstChild("Torso")
+                if torso then
+                    mochila.Position = torso.Position + Vector3.new(0,0,-1.5)
+                    weld.Part1 = torso
+                    weld.Parent = mochila
+                end
+            end
+            -- Mapa (parte blanca con líneas verdes)
+            if not p.Character:FindFirstChild("MapaSelva") then
+                local mapa = Instance.new("Part")
+                mapa.Name = "MapaSelva"
+                mapa.Size = Vector3.new(1.2,1.2,0.2)
+                mapa.Color = Color3.fromRGB(220,255,220)
+                mapa.Material = Enum.Material.SmoothPlastic
+                mapa.CanCollide = false
+                mapa.Anchored = false
+                mapa.Parent = p.Character
+                local weld = Instance.new("WeldConstraint")
+                weld.Part0 = mapa
+                local torso = p.Character:FindFirstChild("UpperTorso") or p.Character:FindFirstChild("Torso")
+                if torso then
+                    mapa.Position = torso.Position + Vector3.new(0.7,0.7,-1.2)
+                    weld.Part1 = torso
+                    weld.Parent = mapa
+                end
+            end
+        end
+    end
+
+    -- Generar lobos hostiles
+    local running = true
+    local function createLobo()
+        local lobo = Instance.new("Model")
+        lobo.Name = "Lobo"
+        local body = Instance.new("Part")
+        body.Name = "Body"
+        body.Size = Vector3.new(3,2,6)
+        body.Position = Vector3.new(math.random(-80,40), 3, math.random(20,90))
+        body.Anchored = false
+        body.BrickColor = BrickColor.new("Dark stone grey")
+        body.Material = Enum.Material.SmoothPlastic
+        body.Parent = lobo
+        local head = Instance.new("Part")
+        head.Name = "Head"
+        head.Size = Vector3.new(2,2,2)
+        head.Position = body.Position + Vector3.new(0,0,3.5)
+        head.Anchored = false
+        head.BrickColor = BrickColor.new("Medium stone grey")
+        head.Material = Enum.Material.SmoothPlastic
+        head.Parent = lobo
+        local humanoid = Instance.new("Humanoid")
+        humanoid.MaxHealth = 60
+        humanoid.Health = 60
+        humanoid.WalkSpeed = 22
+        humanoid.Parent = lobo
+        lobo.Parent = Workspace
+        -- Movimiento y ataque
+        task.spawn(function()
+            while humanoid.Health > 0 and lobo.Parent and running do
+                local closest = nil
+                local minDist = math.huge
+                for _, p in Players:GetPlayers() do
+                    if p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                        local pos = p.Character.HumanoidRootPart.Position
+                        -- ¿Está en refugio?
+                        local inRefugio = false
+                        for _, ref in refugios do
+                            if (pos - ref.Position).Magnitude < (ref.Size.X/2) then
+                                inRefugio = true
+                                break
+                            end
+                        end
+                        if not inRefugio then
+                            local dist = (pos - body.Position).Magnitude
+                            if dist < minDist then
+                                minDist = dist
+                                closest = p
+                            end
+                        end
+                    end
+                end
+                if closest and closest.Character and closest.Character:FindFirstChild("HumanoidRootPart") then
+                    local dir = (closest.Character.HumanoidRootPart.Position - body.Position).Unit
+                    body.Velocity = dir * 22
+                    head.Velocity = dir * 22
+                end
+                task.wait(0.2)
+            end
+        end)
+        body.Touched:Connect(function(hit)
+            local hum = hit.Parent:FindFirstChild("Humanoid")
+            if hum and hum.Health > 0 then
+                hum:TakeDamage(25)
+            end
+        end)
+        return lobo
+    end
+
+    -- Generar varios lobos
+    for i = 1, 7 do
+        createLobo()
+        task.wait(0.5)
+    end
+
+    -- Esperar duración del nivel
+    task.wait(DURATION)
+    running = false
+
+    -- Limpiar Lighting y accesorios
+    Lighting.Ambient = oldAmbient
+    Lighting.Brightness = oldBrightness
+    Lighting.OutdoorAmbient = oldOutdoor
+    for _, obj in Lighting:GetChildren() do
+        if obj:IsA("Sky") then obj:Destroy() end
+    end
+    if oldSky then oldSky.Parent = Lighting end
+    -- Limpiar mochilas y mapas
+    for _, p in Players:GetPlayers() do
+        if p.Character then
+            local mochila = p.Character:FindFirstChild("MochilaSelva")
+            if mochila then mochila:Destroy() end
+            local mapa = p.Character:FindFirstChild("MapaSelva")
+            if mapa then mapa:Destroy() end
+        end
+    end
+end
+
+-- Nivel 7: ¡Recoge todas las botellas de agua!
+local function startBottleLevel()
+    levelEvent:FireAllClients(7, "¡Recoge todas las botellas de agua para sobrevivir!")
+    -- Repartir más botellas si faltan
+    local count = 0
+    for _, obj in Workspace:GetChildren() do
+        if obj.Name:match("^BotellaAgua") then
+            count = count + 1
+        end
+    end
+    for i = count+1, 20 do
+        local botella = Instance.new("Part")
+        botella.Name = "BotellaAgua"..i
+        botella.Size = Vector3.new(0.7, 1.6, 0.7)
+        botella.Position = Vector3.new(math.random(-80,40), 2, math.random(20,90))
+        botella.Anchored = false
+        botella.CanCollide = false
+        botella.Color = Color3.fromRGB(80,180,255)
+        botella.Material = Enum.Material.Glass
+        botella.Parent = Workspace
+
+        local mesh = Instance.new("SpecialMesh")
+        mesh.MeshType = Enum.MeshType.Cylinder
+        mesh.Scale = Vector3.new(0.5,1,0.5)
+        mesh.Parent = botella
+
+        botella.Touched:Connect(function(hit)
+            local hum = hit.Parent:FindFirstChild("Humanoid")
+            if hum and botella.Parent then
+                botella:Destroy()
+                -- Aquí puedes sumar al contador de botellas del jugador si lo deseas
+            end
+        end)
+    end
+    task.wait(LEVEL_DURATION)
+end
+
+-- Bucle de niveles
+while true do
+    cleanUp()
+    startMeteorShower()
+    cleanUp()
+    startZombieWave()
+    cleanUp()
+    startDarkness()
+    cleanUp()
+    startSlippery()
+    cleanUp()
+    startAcidRain()
+    cleanUp()
+    startJungleNight()
+    cleanUp()
+    startBottleLevel()
+    cleanUp()
+    task.wait(5)
+end
+
